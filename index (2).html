@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0a0b">
+<meta name="description" content="Простой список задач: добавление, отметка, редактирование, удаление с отменой. Данные хранятся в браузере.">
+<title>Список задач</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0b'/%3E%3Cpath d='M32 14c-3 0-4 3-5 5-4-1-9-4-17-4 3 3 5 7 5 12-2 1-4 3-4 6 4-2 8-2 11 1 2 2 3 5 4 9l3-6h6l3 6c1-4 2-7 4-9 3-3 7-3 11-1 0-3-2-5-4-6 0-5 2-9 5-12-8 0-13 3-17 4-1-2-2-5-5-5z' fill='%23ff8a00'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0a0a0b;
+    --card: #141416;
+    --field: #0c0c0e;
+    --text: #f3f3f3;
+    --muted: #a3a3ab;
+    --line: #2a2a2f;
+    --accent: #ff8a00;
+    --accent-strong: #ffa733;
+    --on-accent: #0a0a0b;
+    --accent-soft: rgba(255, 138, 0, .15);
+    --danger: #ff5a4d;
+    --danger-soft: rgba(255, 90, 77, .15);
+    --glow: 0 0 0 1px rgba(255, 138, 0, .18), 0 18px 60px rgba(0, 0, 0, .7), 0 0 80px rgba(255, 138, 0, .08);
+    --toast-bg: #ff8a00;
+    --toast-text: #0a0a0b;
+    --toast-action: #0a0a0b;
+    --display: Impact, "Arial Narrow Bold", "Franklin Gothic Medium", "Arial Narrow", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 70% 45% at 50% -5%, rgba(255, 138, 0, .28), transparent 70%),
+      repeating-linear-gradient(135deg, rgba(255, 255, 255, .018) 0 2px, transparent 2px 14px),
+      var(--bg);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 48px 16px 96px;
+  }
+  .app {
+    width: 100%;
+    max-width: 560px;
+    background: var(--card);
+    border-radius: 10px;
+    border-top: 3px solid var(--accent);
+    box-shadow: var(--glow);
+    padding: 28px;
+    align-self: flex-start;
+  }
+  h1 {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 4px;
+    font-family: var(--display);
+    font-size: 32px;
+    font-weight: 400;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-shadow: 0 0 24px rgba(255, 138, 0, .45);
+  }
+  h1 svg { flex: none; width: 40px; height: 40px; filter: drop-shadow(0 0 8px rgba(255, 138, 0, .6)); }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 22px; letter-spacing: .03em; }
+  .subtitle::first-letter { text-transform: uppercase; }
+
+  form { display: flex; gap: 10px; }
+  input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 13px 16px;
+    font: inherit;
+    font-size: 16px;
+    color: var(--text);
+    background: var(--field);
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input[type="text"]::placeholder { color: var(--muted); opacity: 1; }
+  input[type="text"]:focus { border-color: var(--accent); }
+  .add {
+    padding: 0 20px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 17px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--on-accent);
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform .1s, background .15s, box-shadow .15s;
+  }
+  .add:hover { background: var(--accent-strong); box-shadow: 0 0 22px rgba(255, 138, 0, .45); }
+  .add:active { transform: scale(.97); }
+
+  .filters { display: flex; gap: 6px; margin: 20px 0 8px; flex-wrap: wrap; }
+  .filters button {
+    padding: 8px 14px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    cursor: pointer;
+  }
+  .filters button:hover { background: rgba(255, 255, 255, .06); color: var(--text); }
+  .filters button.active { color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
+
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    min-height: 56px;
+    border-bottom: 1px solid var(--line);
+  }
+  li.new { animation: in .2s ease; }
+  @keyframes in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  li:last-child { border-bottom: none; }
+
+  .check {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    border: 2px solid var(--muted);
+    border-radius: 7px;
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition: all .15s;
+  }
+  .check:checked { background: var(--accent); border-color: var(--accent); }
+  .check:checked::after {
+    content: "";
+    width: 6px; height: 11px;
+    border: solid var(--on-accent);
+    border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+  }
+  /* Текст — это <label> чекбокса: клик по нему переключает задачу,
+     а скринридер читает название задачи как имя чекбокса. */
+  .text {
+    flex: 1;
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    font-size: 16px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+  li.done .text { color: var(--muted); text-decoration: line-through; }
+
+  .edit-field { padding: 8px 12px; border-color: var(--accent); }
+
+  .icon-btn {
+    flex: none;
+    display: grid;
+    place-content: center;
+    width: 36px; height: 36px;
+    padding: 0;
+    font: inherit;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .icon-btn svg { width: 18px; height: 18px; display: block; }
+  .edit:hover { color: var(--accent); background: var(--accent-soft); }
+  .del:hover { color: var(--danger); background: var(--danger-soft); }
+  .icon-btn + .icon-btn { margin-left: -6px; }
+  @media (pointer: coarse) {
+    .icon-btn { width: 44px; height: 44px; }
+    .icon-btn + .icon-btn { margin-left: -10px; }
+    .del { margin-right: -6px; }
+    .filters button { padding: 11px 16px; }
+    .check { width: 26px; height: 26px; }
+  }
+
+  .empty { text-align: center; color: var(--muted); padding: 36px 0 24px; font-size: 15px; }
+
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .clear {
+    font: inherit;
+    font-size: 13px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px 0;
+  }
+  .clear:hover { color: var(--danger); }
+  .clear[hidden], .empty[hidden], .toast[hidden] { display: none; }
+
+  .toast {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 20px;
+    margin: 0 auto;
+    width: fit-content;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: calc(100vw - 24px);
+    white-space: nowrap;
+    padding: 12px 12px 12px 18px;
+    font-size: 14px;
+    color: var(--toast-text);
+    background: var(--toast-bg);
+    border-radius: 8px;
+    font-weight: 600;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .6), 0 0 40px rgba(255, 138, 0, .35);
+    animation: up .2s ease;
+  }
+  @keyframes up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .toast button {
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--toast-bg);
+    background: var(--toast-action);
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    cursor: pointer;
+  }
+  .toast button:hover { background: #26262b; }
+  .toast :focus-visible { outline-color: var(--toast-action); outline-offset: 3px; }
+
+  noscript p { color: var(--danger); text-align: center; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 420px) {
+    body { padding: 24px 12px 96px; }
+    .app { padding: 22px 18px; }
+    h1 { font-size: 24px; letter-spacing: .05em; gap: 10px; }
+    h1 svg { width: 32px; height: 32px; }
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .app { box-shadow: none; padding: 0; }
+    form, .filters, .icon-btn, .clear, .toast { display: none !important; }
+  }
+</style>
+</head>
+<body>
+  <main class="app">
+    <h1><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M32 14c-3 0-4 3-5 5-4-1-9-4-17-4 3 3 5 7 5 12-2 1-4 3-4 6 4-2 8-2 11 1 2 2 3 5 4 9l3-6h6l3 6c1-4 2-7 4-9 3-3 7-3 11-1 0-3-2-5-4-6 0-5 2-9 5-12-8 0-13 3-17 4-1-2-2-5-5-5z"/></svg>Список задач</h1>
+    <div class="subtitle" id="date"></div>
+
+    <noscript><p>Для работы списка задач нужен включённый JavaScript.</p></noscript>
+
+    <form id="form" autocomplete="off">
+      <input type="text" id="input" placeholder="Новая задача…" maxlength="200" aria-label="Новая задача">
+      <button class="add" type="submit">Добавить</button>
+    </form>
+
+    <div class="filters" id="filters" role="group" aria-label="Фильтр задач">
+      <button type="button" data-filter="all" class="active" aria-pressed="true">Все</button>
+      <button type="button" data-filter="active" aria-pressed="false">Активные</button>
+      <button type="button" data-filter="done" aria-pressed="false">Выполненные</button>
+    </div>
+
+    <ul id="list"></ul>
+    <div class="empty" id="empty" hidden></div>
+
+    <div class="footer">
+      <span id="counter" aria-live="polite"></span>
+      <button class="clear" id="clear" type="button" hidden>Удалить выполненные</button>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-text"></span>
+    <button type="button" id="undo">Отменить</button>
+  </div>
+
+<script>
+(function () {
+  var KEY = "todo-list-v1";
+  var FILTER_KEY = "todo-list-v1-filter";
+  var MAX_LEN = 200;
+  var UNDO_MS = 6000;
+  var FILTERS = ["all", "active", "done"];
+
+  var tasks = [];         // актуальный список (синхронизируется с localStorage)
+  var filter = "all";
+  var justAdded = null;   // id только что добавленной задачи — анимируем только её
+  var editingId = null;   // id задачи, которая сейчас редактируется
+  var pendingFocus = null;// куда вернуть фокус после следующей перерисовки
+  var undoStack = [];     // удалённые задачи: [{items: [{task, index}]}]
+  var undoTimer = null;
+  var rendering = false;  // true, пока список пересобирается
+
+  var form = document.getElementById("form");
+  var input = document.getElementById("input");
+  var list = document.getElementById("list");
+  var empty = document.getElementById("empty");
+  var counter = document.getElementById("counter");
+  var clearBtn = document.getElementById("clear");
+  var filtersEl = document.getElementById("filters");
+  var toast = document.getElementById("toast");
+  var toastText = document.getElementById("toast-text");
+  var undoBtn = document.getElementById("undo");
+  var dateEl = document.getElementById("date");
+
+  var PENCIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+
+  function updateDate() {
+    dateEl.textContent = new Date().toLocaleDateString("ru-RU", {
+      weekday: "long", day: "numeric", month: "long"
+    });
+  }
+
+  /* ---------- хранилище ---------- */
+
+  // Читает и очищает данные. Возвращает null, если хранилище недоступно
+  // (тогда остаёмся на данных в памяти и сайт продолжает работать).
+  function read() {
+    var raw;
+    try { raw = localStorage.getItem(KEY); } catch (e) { return null; }
+    if (raw === null) return [];
+    var data;
+    try { data = JSON.parse(raw); } catch (e) { return []; }
+    if (!Array.isArray(data)) return [];
+    var seen = {};
+    return data.filter(function (t) {
+      return t && typeof t === "object" && typeof t.text === "string" && t.text.trim() !== "";
+    }).map(function (t) {
+      var id = String(t.id == null ? "" : t.id);
+      if (!id || seen[id]) id = newId();
+      seen[id] = true;
+      return { id: id, text: t.text.slice(0, MAX_LEN), done: t.done === true };
+    });
+  }
+  function write() {
+    try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catch (e) {}
+  }
+  // Перед каждым изменением подтягиваем свежие данные: так вторая вкладка
+  // не затирает задачи, добавленные в первой.
+  function sync() {
+    var fresh = read();
+    if (fresh !== null) tasks = fresh;
+  }
+  function newId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  function loadFilter() {
+    try {
+      var f = localStorage.getItem(FILTER_KEY);
+      if (FILTERS.indexOf(f) !== -1) return f;
+    } catch (e) {}
+    return "all";
+  }
+  function saveFilter() {
+    try { localStorage.setItem(FILTER_KEY, filter); } catch (e) {}
+  }
+
+  /* ---------- отображение ---------- */
+
+  function plural(n, one, few, many) {
+    var m10 = n % 10, m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+    return many;
+  }
+
+  function btn(cls, label, text) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "icon-btn " + cls;
+    b.setAttribute("aria-label", label);
+    if (text) b.textContent = text;
+    return b;
+  }
+
+  function render() {
+    var ae = document.activeElement;
+
+    // если редактируемую задачу удалили в другой вкладке — выходим из режима правки
+    if (editingId && !tasks.some(function (t) { return t.id === editingId; })) editingId = null;
+
+    // запоминаем, где был фокус внутри списка, чтобы не потерять его при перерисовке
+    var focusInfo = null, editValue = null, selStart = 0, selEnd = 0;
+    if (ae && list.contains(ae)) {
+      var cur = ae.closest("li");
+      var kind = ae.classList.contains("del") ? "del"
+        : ae.classList.contains("edit") ? "edit"
+        : ae.classList.contains("edit-field") ? "field" : "check";
+      focusInfo = {
+        id: cur.getAttribute("data-id"),
+        kind: kind,
+        index: Array.prototype.indexOf.call(list.children, cur)
+      };
+      if (kind === "field") { editValue = ae.value; selStart = ae.selectionStart; selEnd = ae.selectionEnd; }
+    }
+    if (pendingFocus) { focusInfo = pendingFocus; pendingFocus = null; }
+
+    rendering = true; // Chrome может послать blur при удалении поля из DOM — игнорируем его
+    list.innerHTML = "";
+    var visible = tasks.filter(function (t) {
+      return filter === "all" || (filter === "done" ? t.done : !t.done);
+    });
+
+    visible.forEach(function (t) {
+      var li = document.createElement("li");
+      li.setAttribute("data-id", t.id);
+      li.className = (t.done ? "done" : "") + (t.id === justAdded ? " new" : "");
+
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.className = "check";
+      cb.id = "task-" + t.id;
+      cb.checked = t.done;
+      cb.addEventListener("change", function () { toggle(t.id); });
+      li.appendChild(cb);
+
+      if (t.id === editingId) {
+        var field = document.createElement("input");
+        field.type = "text";
+        field.className = "edit-field";
+        field.maxLength = MAX_LEN;
+        field.value = editValue !== null ? editValue : t.text;
+        field.setAttribute("aria-label", "Изменить задачу");
+        field.addEventListener("keydown", function (e) {
+          if (e.isComposing) return;
+          if (e.key === "Enter") { e.preventDefault(); commitEdit(t.id, field.value); }
+          else if (e.key === "Escape") { e.preventDefault(); cancelEdit(t.id); }
+        });
+        field.addEventListener("blur", function () {
+          if (!rendering && editingId === t.id) commitEdit(t.id, field.value, true);
+        });
+        li.appendChild(field);
+        if (editValue === null && !focusInfo) focusInfo = { id: t.id, kind: "field", index: 0, selectAll: true };
+        if (editValue === null && focusInfo && focusInfo.kind !== "field") focusInfo = { id: t.id, kind: "field", index: 0, selectAll: true };
+        if (focusInfo && focusInfo.kind === "field" && editValue !== null) { focusInfo.start = selStart; focusInfo.end = selEnd; }
+      } else {
+        var label = document.createElement("label");
+        label.className = "text";
+        label.htmlFor = cb.id;
+        label.textContent = t.text;
+        li.appendChild(label);
+
+        var edit = btn("edit", "Изменить задачу: " + t.text);
+        edit.innerHTML = PENCIL;
+        edit.addEventListener("click", function () { startEdit(t.id); });
+        li.appendChild(edit);
+      }
+
+      var del = btn("del", "Удалить задачу: " + t.text, "×");
+      del.addEventListener("click", function () { remove(t.id); });
+      li.appendChild(del);
+
+      list.appendChild(li);
+    });
+    rendering = false;
+    justAdded = null;
+
+    var activeCount = tasks.filter(function (t) { return !t.done; }).length;
+    var doneCount = tasks.length - activeCount;
+
+    empty.hidden = visible.length > 0;
+    if (!visible.length) {
+      empty.textContent = tasks.length === 0 ? "Пока нет задач. Добавьте первую ✨"
+        : filter === "done" ? "Выполненных задач нет" : "Все задачи выполнены 🎉";
+    }
+    counter.textContent = activeCount + " " +
+      plural(activeCount, "активная задача", "активные задачи", "активных задач");
+    clearBtn.hidden = doneCount === 0;
+
+    // возвращаем фокус: на тот же элемент, а если его больше нет — на соседний
+    if (focusInfo) {
+      var target = list.querySelector('li[data-id="' + String(focusInfo.id).replace(/"/g, '\\"') + '"]');
+      var kindSel = { del: ".del", edit: ".edit", field: ".edit-field", check: ".check" }[focusInfo.kind];
+      if (!target) {
+        var items = list.children;
+        target = items.length ? items[Math.min(focusInfo.index, items.length - 1)] : null;
+        kindSel = focusInfo.kind === "del" ? ".del" : ".check";
+      }
+      var el = target && (target.querySelector(kindSel) || target.querySelector(".check"));
+      if (el) {
+        el.focus();
+        if (el.classList.contains("edit-field")) {
+          if (focusInfo.selectAll) el.select();
+          else if (focusInfo.start != null) el.setSelectionRange(focusInfo.start, focusInfo.end);
+        }
+      } else {
+        input.focus();
+      }
+    } else if (ae === clearBtn && clearBtn.hidden) {
+      input.focus();
+    }
+  }
+
+  /* ---------- действия ---------- */
+
+  function add(text) {
+    sync();
+    var t = { id: newId(), text: text, done: false };
+    tasks.unshift(t);
+    justAdded = t.id;
+    write();
+    if (filter === "done") setFilter("all"); // иначе новая задача «пропала» бы с экрана
+    render();
+  }
+  function toggle(id) {
+    sync();
+    tasks.forEach(function (t) { if (t.id === id) t.done = !t.done; });
+    write(); render();
+  }
+  function remove(id) {
+    sync();
+    var idx = -1;
+    tasks.forEach(function (t, i) { if (t.id === id) idx = i; });
+    if (idx === -1) { render(); return; }
+    if (editingId === id) editingId = null;
+    var removed = tasks.splice(idx, 1)[0];
+    write();
+    pushUndo([{ task: removed, index: idx }]);
+    render();
+  }
+  function clearDone() {
+    sync();
+    var items = [];
+    tasks.forEach(function (t, i) { if (t.done) items.push({ task: t, index: i }); });
+    if (!items.length) return;
+    tasks = tasks.filter(function (t) { return !t.done; });
+    write();
+    pushUndo(items);
+    render();
+  }
+  function setFilter(name, skipSave) {
+    filter = name;
+    if (!skipSave) saveFilter(); // при загрузке страницы ничего не пишем в хранилище
+    Array.prototype.forEach.call(filtersEl.children, function (b) {
+      var on = b.getAttribute("data-filter") === name;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  /* ---------- редактирование ---------- */
+
+  function startEdit(id) {
+    if (editingId && editingId !== id) {
+      // сначала сохраняем предыдущую правку
+      var prev = list.querySelector(".edit-field");
+      if (prev) commitEdit(editingId, prev.value, true);
+    }
+    editingId = id;
+    render();
+  }
+  function commitEdit(id, value, fromBlur) {
+    if (editingId !== id) return;
+    editingId = null;
+    var text = value.trim().slice(0, MAX_LEN);
+    sync();
+    var changed = false;
+    if (text) {
+      tasks.forEach(function (t) { if (t.id === id && t.text !== text) { t.text = text; changed = true; } });
+    }
+    if (changed) write();
+    // при уходе фокуса мышью не крадём его обратно; при Enter возвращаем на кнопку «Изменить»
+    if (!fromBlur) pendingFocus = { id: id, kind: "edit", index: 0 };
+    render();
+  }
+  function cancelEdit(id) {
+    if (editingId !== id) return;
+    editingId = null;
+    pendingFocus = { id: id, kind: "edit", index: 0 };
+    render();
+  }
+
+  /* ---------- отмена удаления ---------- */
+
+  function pushUndo(items) {
+    undoStack.push(items);
+    var n = undoStack.reduce(function (sum, b) { return sum + b.length; }, 0);
+    toastText.textContent = n === 1 ? "Задача удалена" : "Удалено задач: " + n;
+    toast.hidden = false;
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(hideToast, UNDO_MS);
+  }
+  function hideToast() {
+    clearTimeout(undoTimer);
+    toast.hidden = true;
+    undoStack = [];
+  }
+  function undo() {
+    if (!undoStack.length) return;
+    var hadFocus = document.activeElement === undoBtn;
+    sync();
+    var firstRestored = null;
+    while (undoStack.length) {
+      var batch = undoStack.pop();
+      batch.slice().sort(function (a, b) { return a.index - b.index; }).forEach(function (it) {
+        var exists = tasks.some(function (t) { return t.id === it.task.id; });
+        if (!exists) {
+          tasks.splice(Math.min(it.index, tasks.length), 0, it.task);
+          firstRestored = it.task.id;
+        }
+      });
+    }
+    write();
+    hideToast();
+    if (hadFocus && firstRestored) pendingFocus = { id: firstRestored, kind: "check", index: 0 };
+    render();
+  }
+
+  /* ---------- события ---------- */
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var text = input.value.trim().slice(0, MAX_LEN);
+    if (!text) { input.focus(); return; }
+    add(text);
+    input.value = "";
+    input.focus();
+  });
+
+  filtersEl.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-filter]");
+    if (!b) return;
+    setFilter(b.getAttribute("data-filter"));
+    render();
+  });
+
+  // двойной клик по тексту задачи — режим правки (на телефоне — кнопка-карандаш)
+  // Используем второй клик (detail === 2), а не событие dblclick: первый клик по тексту
+  // переключает задачу и пересобирает список, и dblclick до нашего обработчика не дошёл бы.
+  list.addEventListener("click", function (e) {
+    if (e.detail !== 2) return;
+    var lab = e.target.closest(".text");
+    if (!lab) return;
+    e.preventDefault(); // второй клик не должен переключать задачу ещё раз
+    var id = lab.closest("li").getAttribute("data-id");
+    // первый клик уже переключил статус — возвращаем его, двойной клик статус менять не должен
+    sync();
+    tasks.forEach(function (t) { if (t.id === id) t.done = !t.done; });
+    write();
+    if (window.getSelection) { try { window.getSelection().removeAllRanges(); } catch (err) {} }
+    startEdit(id);
+  });
+
+  clearBtn.addEventListener("click", clearDone);
+  undoBtn.addEventListener("click", undo);
+
+  // Ctrl/Cmd+Z — отмена удаления, если пользователь не печатает в поле
+  document.addEventListener("keydown", function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+    if (String(e.key).toLowerCase() !== "z" && e.code !== "KeyZ") return;
+    var tag = e.target && e.target.tagName;
+    if (tag === "INPUT" && e.target.type === "text") return;
+    if (!undoStack.length) return;
+    e.preventDefault();
+    undo();
+  });
+
+  // изменения из другой вкладки подхватываем сразу, без перезагрузки
+  window.addEventListener("storage", function (e) {
+    if (e.key === KEY || e.key === null) { sync(); render(); }
+  });
+
+  // если вкладка простояла до полуночи — обновляем дату
+  window.addEventListener("focus", updateDate);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) updateDate();
+  });
+
+  updateDate();
+  sync();
+  setFilter(loadFilter(), true);
+  render();
+})();
+</script>
+</body>
+</html>
